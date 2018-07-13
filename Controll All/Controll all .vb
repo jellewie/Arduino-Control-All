@@ -100,7 +100,7 @@ ErrHand:
     End Sub
     'Code   - Serial send
     Sub SerialSend(Text As String)
-        TextBoxInput.Text = ""
+        TextBoxInput.Text = Text
         On Error GoTo ErrHand
         SerialPort1.Write(Text)
         RichTextBoxInput.Text &= Text + Chr(13)
@@ -547,19 +547,13 @@ ErrHand:
     'Code   - Set Auto Analog
     Sub SetAutoAnalog()
         If AutoReload.Checked = False Then
-            TextBoxInput.Text = "+   "
-            SerialSend(TextBoxInput.Text)
+            SerialSend("+000")
         Else
-            TextBoxInput.Text = "-   "
-            SerialSend(TextBoxInput.Text)
+            SerialSend("-000")
         End If
     End Sub
     'Code   - Set manual Analog
     Sub SetmanualAnalog()
-        TextBoxInput.Text = "+,  "
-        If AutoReload.Checked = True Then
-            TextBoxInput.Text = "--  "
-        End If
-        SerialSend(TextBoxInput.Text)
+        SerialSend(",000")
     End Sub
 End Class
