@@ -29,20 +29,20 @@ Public Class Serial_Data
 
     '==================================================
     '==================================================
-    '==========          Core V8             ==========
+    '==========          Core V8.1           ==========
     '==================================================
     '==================================================
-    Dim RecievedText As String
-    Dim StartBit As String = "["
-    Dim StopBit As String = "]"
-    Dim MSGBoxName As String
-    Dim MSG As String
-    Dim myPort As Array
-    Dim ArduinoAnswer As String
-    Dim ButtonSelected As String
-    Dim PrefUSB As String
+    Dim RecievedText As String                                                      '
+    Dim StartBit As String = "["                                                    'The 'StartBit' of the correct data so <StartBit> <Data> <StopBit>
+    Dim StopBit As String = "]"                                                     'The 'StopBit' of the data, see above
+    Dim MSGBoxName As String                                                        'The name of the message box
+    Dim MSG As String                                                               'The message displayed in a message box
+    Dim myPort As Array                                                             'The array with ports
+    Dim ArduinoAnswer As String                                                     '
+    Dim ButtonSelected As String                                                    '
+    Dim PrefUSB As String                                                           'The previously slected comport
 
-    Delegate Sub SetTextCallback(ByVal [text] As String) 'Added to prevent threading errors during receiveing of data
+    Delegate Sub SetTextCallback(ByVal [text] As String)                            'Added to prevent threading errors during receiveing of data
     'Action - when closing application
     Private Sub Form2_FormClosing(ByVal sender As Object, ByVal e As System.Windows.Forms.FormClosingEventArgs) Handles Me.FormClosing
         If ButtonConnectDisconnect.Text = "Disconnect" Then
@@ -143,7 +143,7 @@ ErrHand:
             RunOnConnect()                                                          'Run some user code if needed
         Else
             MsgBox("I can not connect to nothing! what where you thinking..." + Chr(13) + "Please give me a COM poort to connect to, before letting me try to connect to it", , MSGBoxName)
-            ReloadUSB()
+            ReloadUSB()                                                             'Reload the current connected USB ports list  (It's no longer up to date)
         End If
         Exit Sub
 ErrHand:
