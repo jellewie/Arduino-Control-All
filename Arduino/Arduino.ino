@@ -1,256 +1,200 @@
+//TODO DEBUG FIXME
+
+
+
+
+
+
+
 /*
   This code is writen by JelleWho
+
+  Pc -> Arduino
+  "+000"   = Enable auto send analog data
+  "-000"   = Disable auto send analog data
+  ",000"   = Send analog data once
+  "&$$$" & = Set amount of min difference between Analog to resync them with the PC
+       $$$ = Amount of min difference, between 000 and 999 (Default 10)
+  "#$$$" # = Pin number, A=pin0 B=pin1 see https://www.arduino.cc/en/Reference/ASCIIchart (numer-64=pin)
+       $$$ = Value to write to pin, between 000 and 255
+
+  Arduino -> PC
+  "EE"     = Error, please resend last data
+  "#$$$" # = Analog Pin number who has changed, A=pin0 B=pin1 see https://www.arduino.cc/en/Reference/ASCIIchart (numer-64=pin)
+       $$$ = Value
 */
+int MinDifference = 10;                                                 //min value the analog needs to change before auto send it
+const int LoopDelay = 1;                                                //Lower = Send data more often (this will let the code loop max 1000x/sec so the Arduino has some time off)
+const int AnalogPins = 6;                                               //Amount of analog pins to send pack to the PC, Software max 33, but even the Mega doesn't have this so no worries
 
-const int MinDifference = 10;   //min value the analog needs to change before auto send it
-const int LoopDelay = 1;        //Lower = Send data more often (this will let the code loop max 1000x/sec so the Arduino has some time off)
-
-
-int Poort = 0;
-int Number = 0;
-int TEMPNumber = 0;
-int TEMPNumber2 = 0;
-boolean AutoAnalog = false;
-boolean ManualAnalog = false;
-int ReadIncomming_1 = 0;
-int ReadIncomming_2 = 0;
-int ReadIncomming_3 = 0;
-int ReadIncomming_4 = 0;
-int ValPot0 = 0;
-int ValPot1 = 0;
-int ValPot2 = 0;
-int ValPot3 = 0;
-int ValPot4 = 0;
-int ValPot5 = 0;
-int OldValPot0 = 0;
-int OldValPot1 = 0;
-int OldValPot2 = 0;
-int OldValPot3 = 0;
-int OldValPot4 = 0;
-int OldValPot5 = 0;
-
-void setup() {
-  Serial.begin(9600);     // opens serial port, sets data rate to 9600 bps
+void setup() {                                                          //This code will runs once in startup
+  Serial.begin(9600);                                                   //Opens serial port, and sets data rate to 9600 bps
 }
-void loop() {
-  if (Serial.available() > 0) {
-    // Read all stuff
-    delay(4);
-    ReadIncomming_1 = Serial.read();
-    ReadIncomming_2 = Serial.read();
-    ReadIncomming_3 = Serial.read();
-    ReadIncomming_4 = Serial.read();
-    //==================================================
-    //https://www.arduino.cc/en/Reference/ASCIIchart
-    if (ReadIncomming_2 == 44) {    //if "," is retrieved, send analog data once
-      ManualAnalog = true;
+void loop() {                                                           //This code will keep on running after start-up
+  static boolean AutoAnalog = false;                                    //If we need to send analog changes to pc automaticly (if min diffrence rule is met)
+  static boolean ManualAnalog = false;                                  //Flagged once to resend the analog pins manually once
+  static const byte DataLength = 4;                                     //Length of data send (DO NOT CHANGE)
+  static int DataRead[DataLength];                                      //The array where the recieved data is stored in
+  static int OldValAnalog[AnalogPins];                                  //The array where the old Analog sensor data is stored in
+  if (Serial.available() > 0) {                                         //If we have some data
+    delay(4);                                                           //Wait some time to make sure we had time to recieve it all. Time = 1/(9600/8)*1000 = 0.83ms per byte
+    if (Serial.available() < 5) {                                       //If not all the data is there
+      Serial.println("Fail:");                                          //Print we have a failed attempt
+      for (int i = 0; Serial.available() > 0 and i < 100; i++) {        //Do for all bytes AND max 100 bytes
+        Serial.print("," + String(Serial.read()));                      //Print that byte (just feedback so we know what the Arduino has recieved)
+      }
+    } else {                                                            //https://www.arduino.cc/en/Reference/ASCIIchart
+      for (int i = 0; i < DataLength; i++) {                            //Get all the data "A999" for example
+        Serial.println("Good:");                                        //Print we have a good attempt
+        DataRead[i] = Serial.read();                                    //Put the data into the array
+        Serial.print("," + String(DataRead[i]));                        //Print the data we have correctly recieved
+      }
+      int Number = -1;                                                  //Set data to be in a valid format as default
+      for (int i = 1; i < DataLength; i++) {                            //Loop the next peece so we will get all values
+        if (DataRead[i] < 48 or DataRead[i] > 57) {                     //If the data isn't a number
+          Number = -2;                                                  //Flag data to be invalid
+        }
+      }
+      if (Number == -1) {                                               //If the data is still not flagged invalid
+        int A = DataRead[1] - 48;                                       //Convert the data to be a number
+        int B = DataRead[2] - 48;                                       //^^
+        int C = DataRead[3] - 48;                                       //^^
+        Number = A * 100 + B * 10 + C;                                  //Calculate the whole numer
+      }
+      if (DataRead[0] == 38) {                                          //If "&" is retrieved
+        MinDifference = Number;                                         //Set the minun diffrence between analog pins resync
+      } else if (DataRead[0] == 43) {                                   //If "+" is retrieved
+        AutoAnalog = true;                                              //Enable auto send analog data
+      } else if (DataRead[0] == 44) {                                   //If "," is retrieved, Send analog data once
+        for (int i = 0; i < AnalogPins; i++) {                          //Do for all the AnalogPins
+          OldValAnalog[i] = -1;                                         //Make the Potmeter value invalid, so we will resend them
+        }
+        ManualAnalog = true;                                            //Send analog data once
+      } else if (DataRead[0] == 45) {                                   //If "-" is retrieved
+        AutoAnalog = false;                                             //Disable auto send analog data
+      } if (DataRead[0] >= 65) {                                        //Check if first one is a valid pin number (65 = A = pin1)
+        if (Number >= 0) {                                              //If there is a valid number
+          int Pin = DataRead[0] - 64;                                   //Now A=1 B=2 etc, see asci chart (This will enable 126 pins selection basicly, so the MEGA will also work with his massive 57 pins)
+          analogWrite(Pin, Number);                                     //Send the number to the Pin
+          Serial.println("Write to Pin " + String(Pin) + " Number " + String(Number));  //TODO DEBUG FIXME
+        }
+      }
     }
-    if (ReadIncomming_1 == 43) {           // if "+" is retrieved, enable auto send analog
-      AutoAnalog = true;
-    } else if (ReadIncomming_1 == 45) {    // if "-" is retrieved, disable auto send analog
-      AutoAnalog = false;
+  } else if (AutoAnalog == false || ManualAnalog == true) { //If we need to update the Analog states
+    for (int i = 0; i < AnalogPins; i++) {                              //Do for all the AnalogPins
+      int ValAnalog = analogRead(0);                                    //Read and store that pin
+      if (ValAnalog - OldValAnalog[i] > MinDifference || OldValAnalog[i] - ValAnalog >= MinDifference) {  //If the pin has changed more then the Minimal Diffrence since last sync
+        OldValAnalog[i] = ValAnalog;                                    //Store this value in the memory as last send value
+        Serial.print("[" + ConvIntToStr(i) + String(ValAnalog) + "]");  //Send the value
+      }
     }
-    Number = 0;
-    Poort = -1;
-    TEMPNumber2 = ReadIncomming_1;
-    if (TEMPNumber2 == 64) {
-      OldValPot0 = -10;
-      OldValPot1 = -10;
-      OldValPot2 = -10;
-      OldValPot3 = -10;
-      OldValPot4 = -10;
-      OldValPot5 = -10;
-    }
-    if (TEMPNumber2 == 65) {
-      Poort = 0;
-    }
-    else if (TEMPNumber2 == 66) {
-      Poort = 1;
-    }
-    else if (TEMPNumber2 == 67) {
-      Poort = 2;
-    }
-    else if (TEMPNumber2 == 68) {
-      Poort = 3;
-    }
-    else if (TEMPNumber2 == 69) {
-      Poort = 4;
-    }
-    else if (TEMPNumber2 == 70) {
-      Poort = 5;
-    }
-    else if (TEMPNumber2 == 71) {
-      Poort = 6;
-    }
-    else if (TEMPNumber2 == 72) {
-      Poort = 7;
-    }
-    else if (TEMPNumber2 == 73) {
-      Poort = 8;
-    }
-    else if (TEMPNumber2 == 74) {
-      Poort = 9;
-    }
-    else if (TEMPNumber2 == 75) {
-      Poort = 10;
-    }
-    else if (TEMPNumber2 == 76) {
-      Poort = 11;
-    }
-    else if (TEMPNumber2 == 77) {
-      Poort = 12;
-    }
-    else if (TEMPNumber2 == 78) {
-      Poort = 13;
-    }
-    //==================================================
-    TEMPNumber2 = ReadIncomming_2;
-    if (TEMPNumber2 == 48) {
-      TEMPNumber = 0;
-    }
-    else if (TEMPNumber2 == 49) {
-      TEMPNumber = 1;
-    }
-    else if (TEMPNumber2 == 50) {
-      TEMPNumber = 2;
-    }
-    else if (TEMPNumber2 == 51) {
-      TEMPNumber = 3;
-    }
-    else if (TEMPNumber2 == 52) {
-      TEMPNumber = 4;
-    }
-    else if (TEMPNumber2 == 53) {
-      TEMPNumber = 5;
-    }
-    else if (TEMPNumber2 == 54) {
-      TEMPNumber = 6;
-    }
-    else if (TEMPNumber2 == 55) {
-      TEMPNumber = 7;
-    }
-    else if (TEMPNumber2 == 56) {
-      TEMPNumber = 8;
-    }
-    else if (TEMPNumber2 == 57) {
-      TEMPNumber = 9;
-    }
-    TEMPNumber = TEMPNumber * 100;
-    Number = Number + TEMPNumber;
-    TEMPNumber = 0;
-    //==================================================
-    TEMPNumber2 = ReadIncomming_3;
-    if (TEMPNumber2 == 48) {
-      TEMPNumber = 0;
-    }
-    else if (TEMPNumber2 == 49) {
-      TEMPNumber = 1;
-    }
-    else if (TEMPNumber2 == 50) {
-      TEMPNumber = 2;
-    }
-    else if (TEMPNumber2 == 51) {
-      TEMPNumber = 3;
-    }
-    else if (TEMPNumber2 == 52) {
-      TEMPNumber = 4;
-    }
-    else if (TEMPNumber2 == 53) {
-      TEMPNumber = 5;
-    }
-    else if (TEMPNumber2 == 54) {
-      TEMPNumber = 6;
-    }
-    else if (TEMPNumber2 == 55) {
-      TEMPNumber = 7;
-    }
-    else if (TEMPNumber2 == 56) {
-      TEMPNumber = 8;
-    }
-    else if (TEMPNumber2 == 57) {
-      TEMPNumber = 9;
-    }
-    TEMPNumber = TEMPNumber * 10;
-    Number = Number + TEMPNumber;
-    TEMPNumber = 0;
-    //==================================================
-    TEMPNumber2 = ReadIncomming_4;
-    if (TEMPNumber2 == 48) {
-      TEMPNumber = 0;
-    }
-    else if (TEMPNumber2 == 49) {
-      TEMPNumber = 1;
-    }
-    else if (TEMPNumber2 == 50) {
-      TEMPNumber = 2;
-    }
-    else if (TEMPNumber2 == 51) {
-      TEMPNumber = 3;
-    }
-    else if (TEMPNumber2 == 52) {
-      TEMPNumber = 4;
-    }
-    else if (TEMPNumber2 == 53) {
-      TEMPNumber = 5;
-    }
-    else if (TEMPNumber2 == 54) {
-      TEMPNumber = 6;
-    }
-    else if (TEMPNumber2 == 55) {
-      TEMPNumber = 7;
-    }
-    else if (TEMPNumber2 == 56) {
-      TEMPNumber = 8;
-    }
-    else if (TEMPNumber2 == 57) {
-      TEMPNumber = 9;
-    }
-    TEMPNumber = TEMPNumber;
-    Number = Number + TEMPNumber;
-    TEMPNumber = 0;
-    //==================================================
-    analogWrite(Poort, Number);
-  } else if (AutoAnalog == false || ManualAnalog == true) {
-    if (ManualAnalog == true) {
-      ManualAnalog = false;
-      OldValPot0 = -1000;
-      OldValPot1 = -1000;
-      OldValPot2 = -1000;
-      OldValPot3 = -1000;
-      OldValPot4 = -1000;
-      OldValPot5 = -1000;
-    }
-    ValPot0 = analogRead(0);
-    if (ValPot0 - OldValPot0 > MinDifference || OldValPot0 - ValPot0 >= MinDifference) {
-      OldValPot0 = ValPot0;
-      Serial.print("[A" + String(ValPot0) + "]");
-    }
-    ValPot1 = analogRead(1);
-    if (ValPot1 - OldValPot1 > MinDifference || OldValPot1 - ValPot1 >= MinDifference) {
-      OldValPot1 = ValPot1;
-      //Serial.print("[B" + String(ValPot1) + "]");
-    }
-    ValPot2 = analogRead(2);
-    if (ValPot2 - OldValPot2 > MinDifference || OldValPot2 - ValPot2 >= MinDifference) {
-      OldValPot2 = ValPot2;
-      //Serial.print("[C" + String(ValPot2) + "]");
-    }
-    ValPot3 = analogRead(3);
-    if (ValPot3 - OldValPot3 > MinDifference || OldValPot3 - ValPot3 >= MinDifference) {
-      OldValPot3 = ValPot3;
-      //Serial.print("[D" + String(ValPot3) + "]");
-    }
-    ValPot4 = analogRead(4);
-    if (ValPot4 - OldValPot4 > MinDifference || OldValPot4 - ValPot4 >= MinDifference) {
-      OldValPot4 = ValPot4;
-      //Serial.print("[E" + String(ValPot4) + "]");
-    }
-    ValPot5 = analogRead(2);
-    if (ValPot5 - OldValPot5 > MinDifference || OldValPot5 - ValPot5 >= MinDifference) {
-      OldValPot5 = ValPot5;
-      //Serial.print("[F" + String(ValPot5) + "]");
-    }
-    delay(LoopDelay);
+  }
+  delay(LoopDelay);                                                     //Just some loop delay
+}
+
+String ConvIntToStr(int i) {                                            //Convert number to Letter, A=0 B=1... ~=32, Returns input if it can't convert it
+  switch (i) {
+    case 0:
+      return "A";
+      break;
+    case 1:
+      return "B";
+      break;
+    case 2:
+      return "C";
+      break;
+    case 3:
+      return "D";
+      break;
+    case 4:
+      return "E";
+      break;
+    case 5:
+      return "F";
+      break;
+    case 6:
+      return "G";
+      break;
+    case 7:
+      return "H";
+      break;
+    case 8:
+      return "I";
+      break;
+    case 9:
+      return "J";
+      break;
+    case 10:
+      return "K";
+      break;
+    case 11:
+      return "L";
+      break;
+    case 12:
+      return "M";
+      break;
+    case 13:
+      return "N";
+      break;
+    case 14:
+      return "O";
+      break;
+    case 15:
+      return "P";
+      break;
+    case 16:
+      return "Q";
+      break;
+    case 17:
+      return "R";
+      break;
+    case 18:
+      return "S";
+      break;
+    case 19:
+      return "T";
+      break;
+    case 20:
+      return "U";
+      break;
+    case 21:
+      return "V";
+      break;
+    case 22:
+      return "W";
+      break;
+    case 23:
+      return "X";
+      break;
+    case 24:
+      return "Y";
+      break;
+    case 25:
+      return "Z";
+      break;
+    case 26:
+      return "[";
+      break;
+    case 27:
+      return "/";
+      break;
+    case 28:
+      return "]";
+      break;
+    case 29:
+      return "{";
+      break;
+    case 30:
+      return "|";
+      break;
+    case 31:
+      return "}";
+      break;
+    case 32:
+      return "~";
+      break;
+    default:
+      return i;
+      break;
   }
 }
-

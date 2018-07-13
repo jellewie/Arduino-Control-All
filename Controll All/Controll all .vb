@@ -1,12 +1,23 @@
 ﻿' This code is written by JelleWho
-' 
+' Pc -> Arduino
+' "+000"   = Enable auto send analog data
+' "-000"   = Disable auto send analog data
+' ",000"   = Send analog data once
+' "&$$$" &= Set amount of min difference between Analog to resync them with the PC
+'      $$$ = Amount of min difference, between 000 And 999 (Default 10)
+' "#$$$" # = Pin number, A=pin0 B=pin1 see https://www.arduino.cc/en/Reference/ASCIIchart (numer-64=pin)
+'      $$$ = Value to write to pin, between 000 And 255
+'
+'  Arduino -> PC
+'  "EE"     = Error, please resend last data
+'  "#$$$" # = Analog Pin number who has changed, A=pin0 B=pin1 see https://www.arduino.cc/en/Reference/ASCIIchart (numer-64=pin)
+'       $$$ = Value
 
 Imports System
 Imports System.Threading
 Imports System.IO.Ports
 Imports System.ComponentModel
 Public Class Serial_Data
-
 
     Dim PrefPoort As String
     Dim Poort As String

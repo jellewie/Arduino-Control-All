@@ -2620,7 +2620,7 @@
     <value>3, 2, 3, 2</value>
   </data>
   <data name="$this.Text" xml:space="preserve">
-    <value>JelleWho - Control all (Arduino Uno)</value>
+    <value> </value>
   </data>
   <data name="&gt;&gt;SerialPort1.Name" xml:space="preserve">
     <value>SerialPort1</value>
