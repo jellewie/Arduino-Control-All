@@ -194,7 +194,7 @@ String ConvIntToStr(int i) {                                            //Conver
       return "~";
       break;
     default:
-      return i;
+      return String(i);
       break;
   }
 }
